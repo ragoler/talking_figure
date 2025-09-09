@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Famous Quotes</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f0f0f0; }
+        .container { background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 600px; width: 100%; }
+        input { padding: 0.5rem; width: calc(100% - 110px); }
+        button { padding: 0.5rem 1rem; }
+        #quotesList { list-style-type: none; padding: 0; margin-top: 1rem; }
+        .quote-card { border: 1px solid #ddd; border-radius: 4px; padding: 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .quote-content { flex-grow: 1; }
+        .quote-text { font-style: italic; }
+        .quote-context { font-size: 0.9rem; color: #555; margin-top: 0.5rem; }
+        .play-button { padding: 0.5rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Famous Quotes</h1>
+        <input type="text" id="personName" placeholder="Enter a person's name">
+        <button onclick="getQuotes()">Get Quotes</button>
+        <div class="voice-selection">
+            <select id="languageSelect"></select>
+            <select id="voiceSelect"></select>
+        </div>
+        <div id="loading" style="display: none;">Loading...</div>
+        <div id="quotesList"></div>
+        <div id="error" style="color: red;"></div>
+    </div>
+    <script>
+        let voicesData = {};
+
+        window.onload = async () => {
+            try {
+                const response = await fetch('/api/voices');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Something went wrong');
+                }
+                voicesData = await response.json();
+                const languageSelect = document.getElementById('languageSelect');
+                for (const langCode in voicesData) {
+                    const option = document.createElement('option');
+                    option.value = langCode;
+                    option.textContent = langCode;
+                    languageSelect.appendChild(option);
+                }
+                languageSelect.onchange = () => {
+                    const selectedLang = languageSelect.value;
+                    const voiceSelect = document.getElementById('voiceSelect');
+                    voiceSelect.innerHTML = '';
+                    voicesData[selectedLang].forEach(voice => {
+                        const option = document.createElement('option');
+                        option.value = voice.name;
+                        option.textContent = `${voice.name} (${voice.gender})`;
+                        voiceSelect.appendChild(option);
+                    });
+                };
+                languageSelect.onchange(); // Trigger once to populate voices
+            } catch (e) {
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = e.message;
+            }
+        };
+
+        async function getQuotes() {
+            const personName = document.getElementById('personName').value;
+            const quotesList = document.getElementById('quotesList');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+
+            quotesList.innerHTML = '';
+            error.innerHTML = '';
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/quotes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: personName })
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Something went wrong');
+                }
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    data.forEach(item => {
+                        const card = document.createElement('div');
+                        card.className = 'quote-card';
+
+                        const content = document.createElement('div');
+                        content.className = 'quote-content';
+
+                        const quote = document.createElement('p');
+                        quote.className = 'quote-text';
+                        quote.textContent = `"${item.quote}"`;
+
+                        const context = document.createElement('p');
+                        context.className = 'quote-context';
+                        context.textContent = item.context;
+
+                        const playButton = document.createElement('button');
+                        playButton.className = 'play-button';
+                        playButton.textContent = 'Play';
+                        playButton.onclick = () => playQuote(item.quote);
+
+                        content.appendChild(quote);
+                        content.appendChild(context);
+                        card.appendChild(content);
+                        card.appendChild(playButton);
+                        quotesList.appendChild(card);
+                    });
+                }
+            } catch (e) {
+                error.textContent = e.message;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        async function playQuote(text) {
+            try {
+                const languageCode = document.getElementById('languageSelect').value;
+                const voiceName = document.getElementById('voiceSelect').value;
+                const response = await fetch('/api/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, language_code: languageCode, voice_name: voiceName })
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Something went wrong');
+                }
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                audio.play();
+            } catch (e) {
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = e.message;
+            }
+        }
+    </script>
+</body>
+</html>

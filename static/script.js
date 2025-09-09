@@ -15,18 +15,33 @@ window.onload = async () => {
             option.textContent = langCode;
             languageSelect.appendChild(option);
         }
+        
+        // Set default language to en-US
+        if (voicesData['en-US']) {
+            languageSelect.value = 'en-US';
+        }
+
         languageSelect.onchange = () => {
             const selectedLang = languageSelect.value;
             const voiceSelect = document.getElementById('voiceSelect');
             voiceSelect.innerHTML = '';
-            voicesData[selectedLang].forEach(voice => {
-                const option = document.createElement('option');
-                option.value = voice.name;
-                option.textContent = `${voice.name} (${voice.gender})`;
-                voiceSelect.appendChild(option);
-            });
+            if (voicesData[selectedLang]) {
+                voicesData[selectedLang].forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.name;
+                    option.textContent = `${voice.name} (${voice.gender})`;
+                    voiceSelect.appendChild(option);
+                });
+            }
         };
         languageSelect.onchange(); // Trigger once to populate voices
+
+        document.getElementById('personName').addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                getQuotes();
+            }
+        });
+
     } catch (e) {
         const errorDiv = document.getElementById('error');
         errorDiv.textContent = e.message;
